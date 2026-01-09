@@ -3,6 +3,8 @@
     export let sightElevation;  // READ ONLY - 0-700 mils
     export let onAdjust = null;  // Callback for adjustments: onAdjust(delta)
     
+    const base = import.meta.env.BASE_URL;
+    
     // LOCKED MOVEMENT MECHANICS
     const FINE_SCALE_PIXELS_PER_MIL = 9.2; // Pixels per mil for fine scale scrolling
     const VISUAL_SCALE = 1.0;
@@ -88,13 +90,13 @@
         <!-- Cylinder masks numbers -->
         <div class="fine-cylinder-mask">
             <img 
-                src="/graphics/sight_elevation_deflection_fine_cylinder.png" 
+                src="{base}graphics/sight_elevation_deflection_fine_cylinder.png" 
                 alt="Fine Cylinder"
             />
             
             <img 
                 class="fine-numbers-scale"
-                src="/graphics/sight_elevation_deflection_fine_numbers_scale.png" 
+                src="{base}graphics/sight_elevation_deflection_fine_numbers_scale.png" 
                 alt="Fine Numbers Scale"
                 style="--fine-scroll: {fineScrollOffset}px"
             />
@@ -103,7 +105,7 @@
         <!-- Indicator on top -->
         <img 
             class="fine-indicator"
-            src="/graphics/sight_elevation_deflection_fine_indicator.png" 
+            src="{base}graphics/sight_elevation_deflection_fine_indicator.png" 
             alt="Fine Indicator"
         />
         

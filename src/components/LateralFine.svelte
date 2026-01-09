@@ -3,6 +3,8 @@
     export let sightDeflection;  // READ ONLY - mils
     export let onAdjust = null;  // Callback for adjustments: onAdjust(delta)
     
+    const base = import.meta.env.BASE_URL;
+    
     // LOCKED MOVEMENT MECHANICS
     const FINE_ROTATION_RANGE = 100; // mils per full rotation - LOCKED
     const VISUAL_SCALE = 1.0;
@@ -88,20 +90,20 @@
     <div class="lateral-fine-container" style="--visual-scale: {VISUAL_SCALE}">
         <div class="lateral-dial-stack">
         <img 
-            src="/graphics/sight_lateral_deflection_fine_indicator.png" 
+            src="{base}graphics/sight_lateral_deflection_fine_indicator.png" 
             alt="Lateral Deflection Indicator"
         />
         
         <img 
             class="lateral-fine-dial"
-            src="/graphics/sight_lateral_deflection_fine_numbers.png" 
+            src="{base}graphics/sight_lateral_deflection_fine_numbers.png" 
             alt="Lateral Deflection Fine Numbers"
             style="--fine-rotation: {fineRotationAngle}deg"
         />
         
         <img 
             class="lateral-fine-glare"
-            src="/graphics/sight_lateral_deflection_fine_glare.png" 
+            src="{base}graphics/sight_lateral_deflection_fine_glare.png" 
             alt="Glare"
         />
         

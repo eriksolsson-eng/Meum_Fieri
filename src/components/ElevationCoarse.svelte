@@ -3,6 +3,8 @@
     export let sightElevation;  // READ ONLY - 0-700 mils
     export let onAdjust = null;  // Callback for adjustments: onAdjust(delta)
     
+    const base = import.meta.env.BASE_URL;
+    
     // LOCKED MOVEMENT MECHANICS
     const INDICATOR_MOVEMENT_FACTOR = 2.33; // LOCKED - Perfect calibration
     const VISUAL_SCALE = 1.0;
@@ -74,13 +76,13 @@
 <div class="elevation-coarse-container" style="--visual-scale: {VISUAL_SCALE}">
     <div class="elevation-scale-container">
         <img 
-            src="/graphics/sight_elevation_deflection_100_scale.png" 
+            src="{base}graphics/sight_elevation_deflection_100_scale.png" 
             alt="Elevation Scale 0-700"
         />
         
         <img 
             class="elevation-indicator"
-            src="/graphics/sight_elevation_deflection_100_indicator.png" 
+            src="{base}graphics/sight_elevation_deflection_100_indicator.png" 
             alt="Elevation Indicator"
             style="--indicator-offset: {indicatorVerticalOffset}%"
         />

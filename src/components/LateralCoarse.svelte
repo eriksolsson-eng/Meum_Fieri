@@ -4,6 +4,8 @@
     export let onAdjust = null;  // Callback for adjustments: onAdjust(delta)
     export let onReset = null;   // Callback for reset to 0 mils
     
+    const base = import.meta.env.BASE_URL;
+    
     // LOCKED MOVEMENT MECHANICS
     const DEFLECTION_SCROLL_FACTOR = 0.324; // pixels per mil - corrected for 1100px container
     
@@ -101,13 +103,13 @@
     <div class="cylinder-mask">
         <img 
             class="cylinder-image"
-            src="/graphics/sight_lateral_coarse_cylinder.png" 
+            src="{base}graphics/sight_lateral_coarse_cylinder.png" 
             alt="Lateral Coarse Cylinder"
         />
         
         <img 
             class="numbers-scale"
-            src="/graphics/sight_lateral_coarse_numbers.png" 
+            src="{base}graphics/sight_lateral_coarse_numbers.png" 
             alt="Lateral Coarse Numbers"
             style="--deflection-scroll: {deflectionScrollOffset}px"
         />

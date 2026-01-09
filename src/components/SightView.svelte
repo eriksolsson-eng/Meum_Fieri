@@ -5,6 +5,8 @@
     export let backgroundElevationShift;
     export let backStickElevationShift;
     export let frontStickElevationShift;
+    
+    const base = import.meta.env.BASE_URL;
 </script>
 
 <style>
@@ -81,21 +83,21 @@
 <div class="sight-view">
     <!-- Background Layer - moves most with elevation -->
     <div class="background-layer" style="transform: translate(calc(-50% + {backgroundMovement}px), {backgroundElevationShift}px);">
-        <img src="/graphics/background.jpg" alt="Terrain Background" />
+        <img src="{base}graphics/background.jpg" alt="Terrain Background" />
     </div>
 
     <!-- Sight Reticle (Always centered - NO elevation movement) -->
     <div class="sight-overlay" style="transform: translate(-50%, 0);">
-        <img src="/graphics/sight.png" alt="Mortar Sight Reticle" />
+        <img src="{base}graphics/sight.png" alt="Mortar Sight Reticle" />
     </div>
 
     <!-- Front Stick (Closer) - moves with background + deflection parallax + least elevation parallax -->
     <div class="stick-layer front-stick" style="transform: translate(calc(-50% + {frontStickMovement}px), {frontStickElevationShift}px);">
-        <img src="/graphics/front_stick.png" alt="Front Aiming Stick" />
+        <img src="{base}graphics/front_stick.png" alt="Front Aiming Stick" />
     </div>
 
     <!-- Back Stick (Further away) - moves with background + less deflection parallax + intermediate elevation parallax -->
     <div class="stick-layer back-stick" style="transform: translate(calc(-50% + {backStickMovement}px), {backStickElevationShift}px);">
-        <img src="/graphics/back_stick.png" alt="Back Aiming Stick" />
+        <img src="{base}graphics/back_stick.png" alt="Back Aiming Stick" />
     </div>
 </div>
