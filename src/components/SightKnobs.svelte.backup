@@ -1,0 +1,305 @@
+<script>
+    export let sightElevation;  // 0-700 mils
+    export let sightDeflection; // mils (can be negative)
+    
+    // Calculate rotation angles for visual feedback
+    // Elevation: 0-700 maps to 0-360 degrees (with wrapping for fine knob)
+    $: elevationCoarseAngle = (sightElevation / 700) * 360;
+    $: elevationFineAngle = ((sightElevation % 100) / 100) * 360;
+    
+    // Deflection: Normalize to 0-99 range for coarse, then fine
+    // Assuming ±1000 mil range maps to multiple rotations
+    $: deflectionNormalized = ((sightDeflection % 100) + 100) % 100;
+    $: deflectionCoarseAngle = (deflectionNormalized / 100) * 360;
+    
+    // Fine deflection - show subdivisions
+    $: deflectionFineValue = sightDeflection % 10;
+    $: deflectionFineAngle = (deflectionFineValue / 10) * 360;
+    
+    // Click handlers for interactive adjustment
+    function adjustElevation(delta) {
+        const event = new CustomEvent('adjust-elevation', { detail: delta });
+        window.dispatchEvent(event);
+    }
+    
+    function adjustDeflection(delta) {
+        const event = new CustomEvent('adjust-deflection', { detail: delta });
+        window.dispatchEvent(event);
+    }
+</script>
+
+<style>
+    .knobs-container {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 40px;
+        padding: 20px;
+        background: rgba(40, 40, 35, 0.95);
+        border-radius: 8px;
+        border: 2px solid #4a4438;
+        margin-top: 20px;
+    }
+    
+    .knob-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 15px;
+    }
+    
+    .knob-label {
+        font-size: 1rem;
+        font-weight: bold;
+        color: #c4a57b;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    /* Elevation Knob (Horizontal cylinder style) */
+    .elevation-knob {
+        position: relative;
+        width: 600px;
+        height: 120px;
+    }
+    
+    .elevation-scale {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+    }
+    
+    .elevation-scale img {
+        position: absolute;
+        height: 100%;
+        top: 0;
+        transform: translateX(calc(-50% + var(--elevation-offset)));
+    }
+    
+    .elevation-indicator {
+        position: absolute;
+        left: 50%;
+        top: -30px;
+        transform: translateX(-50%);
+        width: 40px;
+        height: auto;
+        z-index: 10;
+        pointer-events: none;
+    }
+    
+    .elevation-fine-scale {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 50%;
+        overflow: hidden;
+    }
+    
+    .elevation-fine-scale img {
+        position: absolute;
+        height: 100%;
+        transform: translateX(calc(-50% + var(--elevation-fine-offset)));
+    }
+    
+    /* Lateral Knob (Circular dial style) */
+    .lateral-knob {
+        position: relative;
+        width: 300px;
+        height: 300px;
+    }
+    
+    .knob-layer {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform-origin: center center;
+    }
+    
+    .coarse-scale {
+        width: 300px;
+        height: 300px;
+        margin-left: -150px;
+        margin-top: -150px;
+    }
+    
+    .coarse-scale img {
+        width: 100%;
+        height: 100%;
+        transform: rotate(var(--deflection-coarse-angle));
+    }
+    
+    .fine-scale {
+        width: 200px;
+        height: 200px;
+        margin-left: -100px;
+        margin-top: -100px;
+        z-index: 2;
+    }
+    
+    .fine-scale img {
+        width: 100%;
+        height: 100%;
+        transform: rotate(var(--deflection-fine-angle));
+    }
+    
+    .lateral-indicator {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 30px;
+        height: auto;
+        z-index: 10;
+        pointer-events: none;
+    }
+    
+    .cylinder-base {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+    }
+    
+    .glare-effect {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        z-index: 5;
+        pointer-events: none;
+    }
+    
+    .value-display {
+        text-align: center;
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #9ca041;
+        margin-top: 10px;
+        font-family: monospace;
+    }
+    
+    .interactive-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        cursor: pointer;
+        z-index: 15;
+    }
+    
+    .interactive-overlay:hover {
+        background: radial-gradient(circle, rgba(156, 160, 65, 0.1), transparent);
+    }
+</style>
+
+<div class="knobs-container">
+    <!-- Elevation Knob -->
+    <div class="knob-group">
+        <div class="knob-label">Elevation</div>
+        <div class="elevation-knob">
+            <!-- Coarse scale (0-700) -->
+            <div class="elevation-scale">
+                <img 
+                    src="assets/graphics/sight_elevation_deflection_100_scale.png" 
+                    alt="Elevation Scale"
+                    style="--elevation-offset: {-elevationCoarseAngle}px"
+                />
+            </div>
+            
+            <!-- Fine scale (00-99) -->
+            <div class="elevation-fine-scale">
+                <img 
+                    src="assets/graphics/sight_elevation_deflection_fine_numbers_scale.png" 
+                    alt="Elevation Fine Scale"
+                    style="--elevation-fine-offset: {-elevationFineAngle}px"
+                />
+            </div>
+            
+            <!-- Indicator (red pointer) -->
+            <img 
+                class="elevation-indicator" 
+                src="assets/graphics/sight_elevation_deflection_100_indicator.png" 
+                alt="Elevation Indicator"
+            />
+            
+            <!-- Cylinder base -->
+            <img 
+                class="cylinder-base" 
+                src="assets/graphics/sight_elevation_deflection_fine_cylinder.png" 
+                alt="Cylinder"
+            />
+            
+            <!-- Interactive overlay -->
+            <div class="interactive-overlay" 
+                 on:click={(e) => {
+                     const rect = e.currentTarget.getBoundingClientRect();
+                     const clickX = e.clientX - rect.left;
+                     const delta = clickX < rect.width / 2 ? -10 : 10;
+                     adjustElevation(delta);
+                 }}
+            ></div>
+        </div>
+        <div class="value-display">{sightElevation} mils</div>
+    </div>
+    
+    <!-- Lateral (Deflection) Knob -->
+    <div class="knob-group">
+        <div class="knob-label">Deflection</div>
+        <div class="lateral-knob">
+            <!-- Coarse scale (outer ring 00-99) -->
+            <div class="knob-layer coarse-scale">
+                <img 
+                    src="assets/graphics/sight_deflection_fine_numbers.png" 
+                    alt="Deflection Coarse Scale"
+                    style="--deflection-coarse-angle: {deflectionCoarseAngle}deg"
+                />
+            </div>
+            
+            <!-- Fine scale (inner detail) -->
+            <div class="knob-layer fine-scale">
+                <img 
+                    src="assets/graphics/sight_deflection_fine_indicator.png" 
+                    alt="Deflection Fine Indicator"
+                    style="--deflection-fine-angle: {deflectionFineAngle}deg"
+                />
+            </div>
+            
+            <!-- Indicator (top pointer) -->
+            <img 
+                class="lateral-indicator" 
+                src="assets/graphics/sight_deflection_fine_indicator.png" 
+                alt="Deflection Indicator"
+            />
+            
+            <!-- Cylinder base -->
+            <img 
+                class="cylinder-base" 
+                src="assets/graphics/sight_deflection_cylinder.png" 
+                alt="Deflection Cylinder"
+            />
+            
+            <!-- Glare effect -->
+            <img 
+                class="glare-effect" 
+                src="assets/graphics/sight_deflection_fine_glare.png" 
+                alt="Glare"
+            />
+            
+            <!-- Interactive overlay -->
+            <div class="interactive-overlay"
+                 on:click={(e) => {
+                     const rect = e.currentTarget.getBoundingClientRect();
+                     const centerX = rect.width / 2;
+                     const clickX = e.clientX - rect.left;
+                     const delta = clickX < centerX ? -10 : 10;
+                     adjustDeflection(delta);
+                 }}
+            ></div>
+        </div>
+        <div class="value-display">{sightDeflection} mils</div>
+    </div>
+</div>

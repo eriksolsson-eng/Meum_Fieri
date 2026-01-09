@@ -1,0 +1,294 @@
+<script>
+    import { onMount } from 'svelte';
+
+    // --- Core State Variables (Driven by Levers) ---
+    // These represent the three axes of mechanical adjustment in Mils (or degrees, but Mils are standard).
+    let elevationAngle = 1000; // Vertical angle of the tube (Range) - User sets this, but doesn't manually aim it.
+    let deflectionOffset = 0;  // Horizontal angle of the sight (Azimuth/Lay) - MANUALLY ADJUSTED BY PLAYER
+    let crossLevelAngle = 0;   // Lateral tilt of the bipod/tube - MANUALLY ADJUSTED BY PLAYER
+
+    // --- Visual Output Variables ---
+    // These are derived from the core state and govern the visual movement.
+    let sightMovement = 0;    // Pixels to shift the sight reticle horizontally
+    let frontStickMovement = 0; // Pixels to shift the front stick
+    let backStickMovement = 0;  // Pixels to shift the back stick
+    let lateralBubblePos = 0;   // Position of the lateral spirit bubble (in pixels)
+    let longitudinalBubblePos = 0; // Position of the longitudinal spirit bubble (in pixels)
+
+    // --- Game Parameters (Sensitivity/Fidelity) ---
+    const STICK_DISTANCE_FRONT = 10; // Closer stick, less parallax movement
+    const STICK_DISTANCE_BACK = 20;  // Further stick, more parallax movement
+    const DEFLECTION_SENSITIVITY = 0.5; // Pixels per mil of deflection
+    const LEVEL_SENSITIVITY = 200; // Pixels per degree of cross-level (MAKE IT HIGHLY SENSITIVE)
+    const MAX_CROSS_LEVEL = 1; // Maximum realistic cross-level error in degrees (1 degree = 17.7 mils)
+
+    // --- Cranks/Levers ---
+    // The user will drag or click on the UI elements linked to these functions.
+    // In Svelte, we bind these to a slider or drag listener.
+
+    /**
+     * Lever 3: Cross-Leveling Crank (MANDATORY FIRST STEP)
+     * Adjusts the lateral tilt of the entire system.
+     */
+    function adjustCrossLevel(delta) {
+        // Prevent it from going too far off level
+        crossLevelAngle = Math.min(MAX_CROSS_LEVEL, Math.max(-MAX_CROSS_LEVEL, crossLevelAngle + delta * 0.001));
+    }
+
+    /**
+     * Lever 2: Deflection Crank (MANDATORY SECOND STEP)
+     * Adjusts the sight's horizontal aim relative to the sticks.
+     */
+    function adjustDeflection(delta) {
+        // This is the player's primary aiming input
+        deflectionOffset += delta * 0.1;
+    }
+
+    /**
+     * Lever 1: Elevation Crank (Range Adjustment)
+     * This is the fine vertical adjustment.
+     */
+    function adjustElevation(delta) {
+        elevationAngle += delta * 10;
+        // In a real game, this would be set by a Fire Mission, but here it's an input.
+    }
+
+    // --- Game Engine / Update Loop (Reactive Logic) ---
+    // In Svelte, reactive statements automatically recalculate when dependencies change.
+
+    // 1. Leveling Logic (The Fiddly Part)
+    // The bubbles react to the mortar's actual tilt (crossLevelAngle and elevationAngle).
+    $: lateralBubblePos = -crossLevelAngle * LEVEL_SENSITIVITY;
+    // The longitudinal bubble reacts to elevation, but its sensitivity is generally lower
+    // and depends on ground slope, which we can simulate as a constant offset for simplicity.
+    // For a challenge, let's make it react to the tube's elevation and a fixed ground slope (e.g., 0.5 deg).
+    const groundSlope = 0.5; // Assume 0.5 degrees of uneven ground
+    $: longitudinalBubblePos = (elevationAngle / 17.777 - 90 + groundSlope) * LEVEL_SENSITIVITY / 10; // Very simple calculation
+
+    // 2. Parallax and Deflection Logic
+    // All objects must be aligned horizontally based on the deflectionOffset (sight rotation)
+    // AND the current cross-level error. This is the critical relationship.
+
+    // Base horizontal offset is the desired deflection.
+    let baseOffset = 0;
+    $: baseOffset = deflectionOffset * DEFLECTION_SENSITIVITY;
+
+    // The Cross-Leveling Error (The Fiddliness): If the mortar is tilted (crossLevelAngle != 0),
+    // any elevation change causes horizontal drift. Since the sight is rotated *relative* to the
+    // sticks (which are fixed on the ground), the sight is not level and shifts horizontally as the tube moves.
+    // The sticks MUST shift relative to the sight based on this error.
+
+    // Lateral Shift (The alignment target moves based on level error)
+    $: lateralErrorShift = crossLevelAngle * elevationAngle / 100; // Simple error model: Error grows with tilt AND elevation.
+
+    // Sight (Reticle) Movement - The center point
+    $: sightMovement = baseOffset;
+
+    // Stick Movement (Parallax)
+    // The sticks appear to move horizontally as the sight rotates (baseOffset).
+    // They also appear to shift due to the lateral error (lateralErrorShift).
+    // The sticks must be offset from each other based on their distance (parallax).
+    $: frontStickMovement = baseOffset * STICK_DISTANCE_FRONT - lateralErrorShift;
+    $: backStickMovement = baseOffset * STICK_DISTANCE_BACK - lateralErrorShift;
+
+    // --- Function to Check for Success ---
+    // Goal: crossLevelAngle must be near zero AND (frontStickMovement is near sightMovement)
+    let isAimed = false;
+    $: isAimed = Math.abs(crossLevelAngle) < 0.01 && // Lateral Level is near perfect
+                 Math.abs(frontStickMovement - sightMovement) < 5 && // Sticks are visually close to sight
+                 Math.abs(backStickMovement - sightMovement) < 5;
+
+</script>
+
+<!-- The HTML/CSS structure will simulate the view through the sight -->
+<style>
+    .sight-container {
+        position: relative;
+        width: 600px;
+        height: 300px;
+        overflow: hidden;
+        border: 4px solid #333;
+        border-radius: 8px;
+        background-color: #222;
+        margin: 20px auto;
+        font-family: 'Inter', sans-serif;
+    }
+    .layer {
+        position: absolute;
+        height: 100%;
+        top: 0;
+        transition: transform 0.05s linear; /* Smooth visual updates */
+    }
+    .reticle {
+        /* Sight reticle - always centered vertically, moves with sightMovement */
+        left: 50%;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transform: translateX(calc(-50% + {sightMovement}px));
+    }
+    .stick {
+        width: 5px;
+        background-color: white;
+    }
+    .aiming-stick-front, .aiming-stick-back {
+        left: 50%;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+    }
+    .aiming-stick-front {
+        transform: translateX(calc(-50% + {frontStickMovement}px));
+        opacity: 0.8;
+    }
+    .aiming-stick-back {
+        transform: translateX(calc(-50% + {backStickMovement}px));
+        opacity: 0.5;
+    }
+    .info {
+        color: white;
+        text-align: center;
+        padding: 10px;
+        background: #111;
+        border-radius: 4px;
+        margin-top: 10px;
+    }
+    .lever-controls {
+        display: flex;
+        justify-content: space-around;
+        padding: 20px 0;
+    }
+    .lever-controls button {
+        background: #34d399; /* Tailwind green-400 */
+        color: #111827; /* Tailwind gray-900 */
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: bold;
+        transition: background-color 0.2s;
+        box-shadow: 0 4px #10b981; /* Tailwind green-500 shadow */
+    }
+    .lever-controls button:active {
+        box-shadow: none;
+        transform: translateY(2px);
+    }
+    .lever-controls button:hover {
+        background: #10b981;
+    }
+
+    /* CSS for highly sensitive spirit levels */
+    .level-container {
+        display: flex;
+        justify-content: center;
+        gap: 40px;
+        margin-top: 20px;
+    }
+    .spirit-level {
+        width: 250px;
+        height: 40px;
+        background: #ccc;
+        border: 2px solid #555;
+        border-radius: 20px;
+        position: relative;
+        overflow: hidden;
+    }
+    .bubble {
+        width: 30px;
+        height: 30px;
+        background: radial-gradient(circle at 40% 40%, #fff, #99c);
+        border: 1px solid #333;
+        border-radius: 50%;
+        position: absolute;
+        top: 5px;
+        left: 50%;
+        transform: translateX(calc(-50% + var(--bubble-pos, 0px)));
+        transition: transform 0.05s linear;
+        box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+    }
+    .center-marks {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .center-marks::before, .center-marks::after {
+        content: '';
+        position: absolute;
+        width: 1px;
+        height: 100%;
+        background: red;
+    }
+    .center-marks::before {
+        left: 40%;
+    }
+    .center-marks::after {
+        right: 40%;
+    }
+</style>
+
+<div class="p-4 bg-gray-800 rounded-lg shadow-2xl mx-auto max-w-2xl text-white">
+    <h2 class="text-3xl font-bold text-center text-green-400 mb-4">Manual Mortar Aiming Simulator</h2>
+    <p class="text-center mb-4">Goal: Center the Lateral Bubble (Level 3) then align the Sight with the sticks (Level 2).</p>
+
+    <div class="sight-container">
+        <!-- BACKGROUND LAYER (Far Parallax) -->
+        <div class="layer aiming-stick-back" style="--base-offset: {backStickMovement}px;">
+            <div class="stick h-full bg-gray-500"></div>
+        </div>
+
+        <!-- MIDDLE LAYER (Near Parallax) -->
+        <div class="layer aiming-stick-front" style="--base-offset: {frontStickMovement}px;">
+            <div class="stick h-full bg-gray-300"></div>
+        </div>
+
+        <!-- FOREGROUND LAYER (Sight) -->
+        <div class="layer reticle" style="--base-offset: {sightMovement}px;">
+            <div class="w-1 h-full bg-red-500"></div> <!-- Vertical Reticle Line -->
+            <div class="absolute w-full h-1 bg-red-500" style="top: 50%;"></div> <!-- Horizontal Reticle Line -->
+        </div>
+    </div>
+
+    <div class="level-container">
+        <!-- Lateral Level (Driven by Cross-Level Angle) -->
+        <div class="spirit-level">
+            <div class="center-marks"></div>
+            <div class="bubble" style="--bubble-pos: {lateralBubblePos}px;"></div>
+        </div>
+
+        <!-- Longitudinal Level (Driven by Elevation/Ground) - Less Critical for Deflection -->
+        <div class="spirit-level">
+            <div class="center-marks"></div>
+            <div class="bubble" style="--bubble-pos: {longitudinalBubblePos}px;"></div>
+        </div>
+    </div>
+
+    <div class="info mt-4">
+        <p class="text-xl font-semibold">Status: <span class="{isAimed ? 'text-green-400' : 'text-red-400'}">{isAimed ? 'AIMED AND LEVEL' : 'OFF TARGET'}</span></p>
+        <p>Cross-Level Error: {crossLevelAngle.toFixed(3)} deg</p>
+        <p>Deflection Offset: {deflectionOffset.toFixed(1)} mils</p>
+    </div>
+
+    <!-- Interface Controls (Simulated Cranks) -->
+    <div class="lever-controls">
+        <!-- Lever 1: Elevation -->
+        <div>
+            <p class="font-bold mb-2">Elevation Crank</p>
+            <button on:click={() => adjustElevation(1)}>Raise</button>
+            <button on:click={() => adjustElevation(-1)}>Lower</button>
+        </div>
+        <!-- Lever 2: Deflection -->
+        <div>
+            <p class="font-bold mb-2">Deflection Crank</p>
+            <button on:click={() => adjustDeflection(1)}>Left</button>
+            <button on:click={() => adjustDeflection(-1)}>Right</button>
+        </div>
+        <!-- Lever 3: Cross-Leveling -->
+        <div>
+            <p class="font-bold mb-2">Cross-Leveling Crank</p>
+            <button on:click={() => adjustCrossLevel(1)}>Level Left</button>
+            <button on:click={() => adjustCrossLevel(-1)}>Level Right</button>
+        </div>
+    </div>
+</div>

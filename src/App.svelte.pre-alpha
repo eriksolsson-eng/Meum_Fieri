@@ -1,0 +1,622 @@
+<script>
+    import SightView from './components/SightView.svelte';
+    import StatusDisplay from './components/StatusDisplay.svelte';
+    import SpiritLevels from './components/SpiritLevels.svelte';
+    import DeflectionIndicator from './components/DeflectionIndicator.svelte';
+    import CrankControls from './components/CrankControls.svelte';
+    import MissionControls from './components/MissionControls.svelte';
+    import ElevationCoarse from './components/ElevationCoarse.svelte';
+    import ElevationFine from './components/ElevationFine.svelte';
+    import LateralCoarse from './components/LateralCoarse.svelte';
+    import LateralFine from './components/LateralFine.svelte';
+
+    // --- Core State Variables (Driven by Levers) ---
+    let sightElevation = 350; // Sighting instrument elevation setting (rotates the optic)
+    let sightDeflection = 0;  // Sight deflection setting - rotates sight mechanism (mils)
+    
+    // DEFLECTION: Two separate systems
+    let bipodPosition = 0;     // Rough adjustment - moving entire bipod (unlimited range)
+    let deflectionCrank = 0;   // Fine adjustment - extension piston (LIMITED to ±25 mils)
+    
+    // ELEVATION: Two separate systems
+    let bipodElevation = 0;    // Rough adjustment - bipod leg distance/foot position (±150 mils)
+    let elevationCrank = 0;    // Fine adjustment - elevation crank (LIMITED to ±200 mils)
+    
+    let crossLevelAngle = 0;   // Lateral tilt of the bipod/tube
+    
+    // --- Fire Mission Parameters ---
+    const REGISTRATION_DEFLECTION = 0; // The zero reference when sticks are aligned (mils) - Swedish system
+    
+    let targetDeflection = 500; // Fire mission deflection (mils) - within limited range
+    let targetElevation = 500; // Fire mission elevation (mils) - player must achieve this
+    let targetCharge = 3;  // Charge zone 1-6
+    let roundsToFire = 1;  // Number of rounds in fire mission
+    let roundType = 'HE';  // 'HE', 'ILLUM', 'SMOKE'
+    let fuzeType = 'impact';  // 'impact', 'proximity', 'delay'
+    let fuzeDelay = 0;  // Seconds delay for illumination/smoke (0-30s)
+    
+    // Ammunition state
+    let totalRoundsAvailable = 30;
+    let roundsFired = 0;
+    let roundInventory = {
+        HE: 20,
+        ILLUM: 5,
+        SMOKE: 5
+    };
+    
+    // Game state
+    let currentMissionIndex = 0;
+    let gameActive = false;
+    const missionsPerGame = 3;
+    
+    // Pre-defined fire missions for the game
+    const gameMissions = [
+        // Mission 1: Far Right
+        { deflection: 940, elevation: 420, charge: 3, roundType: 'HE', fuzeType: 'impact', fuzeDelay: 0 },
+        // Mission 2: Light Left  
+        { deflection: -80, elevation: 450, charge: 4, roundType: 'SMOKE', fuzeType: null, fuzeDelay: 12 },
+        // Mission 3: Light Right
+        { deflection: 85, elevation: 580, charge: 5, roundType: 'ILLUM', fuzeType: null, fuzeDelay: 18 }
+    ];
+    
+    // --- Constants and Settings ---
+    const REFERENCE_ELEVATION = 350;   // Reference elevation where spirit level is neutral (mils)
+    
+    // ========================================================================
+    // CRITICAL SECTION: PARALLAX AIMING MECHANICS - DO NOT MODIFY
+    // ========================================================================
+    // This section controls the visual parallax that enables aiming.
+    // 
+    // PHYSICAL LAYOUT (front to back):
+    //   1. Sight/Crosshair (fixed at center, z-index 4)
+    //   2. Front stick - RED, shorter/thinner, CLOSER to mortar (z-index 3)
+    //   3. Back stick - YELLOW, taller/thicker, FARTHER from mortar (z-index 2)
+    //   4. Background terrain (z-index 1)
+    //
+    // PARALLAX BEHAVIOR:
+    //   - Front stick (closer): Moves MORE (1.0x parallax factor)
+    //   - Back stick (farther): Moves LESS (0.5x parallax factor)
+    //   - This creates the symmetry needed for aiming
+    //
+    // AIMING LOGIC:
+    //   When sight deflection > 0 (positive): crosshair → back = back → front
+    //   When sight deflection < 0 (negative): front → back = back → crosshair
+    //
+    // CHANGING THESE VALUES WILL BREAK THE AIMING SYSTEM!
+    // ========================================================================
+    
+    const SIGHT_PARALLAX_PX_PER_MIL = 0.235;  // Adjusted for sight_small.png container
+    const DEFLECTION_CRANK_PX_PER_MIL = 1.8;  // Background movement - adjusted for 1800px container
+    const FRONT_PARALLAX = 1.0;   // Front stick: full parallax offset (moves MORE)
+    const BACK_PARALLAX = 0.5;    // Back stick: half parallax offset (moves LESS)
+    
+    // Validation: Verify parallax constants haven't been accidentally changed
+    if (FRONT_PARALLAX !== 1.0 || BACK_PARALLAX !== 0.5) {
+        console.error('CRITICAL ERROR: Parallax constants have been modified! Aiming will not work correctly.');
+        console.error(`Expected: FRONT=1.0, BACK=0.5 | Actual: FRONT=${FRONT_PARALLAX}, BACK=${BACK_PARALLAX}`);
+    }
+    
+    // ELEVATION PARALLAX: Different vertical movement rates
+    const BACKGROUND_ELEVATION_PARALLAX = 0.4;   // Background moves most
+    const BACK_STICK_ELEVATION_PARALLAX = 0.2;   // Back stick intermediate
+    const FRONT_STICK_ELEVATION_PARALLAX = 0.1;  // Front stick moves least
+    // Sight stays fixed (0.0 parallax)
+    
+    const DEFLECTION_SENSITIVITY = DEFLECTION_CRANK_PX_PER_MIL; // For background movement
+    const ELEVATION_SENSITIVITY = 0.5; // Vertical movement per mil of elevation change
+    const LEVEL_SENSITIVITY = 0.5; // Reduced - bubble should reach edge at reasonable offset (50px at 100 mils)
+    
+    // --- Granularity/Step Size ---
+    const deflectionGranularity = 1;    // 1 mil per click
+    const elevationGranularity = 1;     // 1 mil per click
+    const crankGranularity = 1;        // 1 mil per crank turn
+    const roughDeflectionStep = 150;    // 150 mils per rough adjustment (bipod movement) - 10x scale
+    
+    // --- Deflection Crank Mechanical Limits ---
+    const DEFLECTION_CRANK_MIN = -250;  // Extension piston minimum (10x scale)
+    const DEFLECTION_CRANK_MAX = 250;   // Extension piston maximum (10x scale)
+    
+    // --- Elevation Crank Mechanical Limits ---
+    const ELEVATION_CRANK_MIN = -200;  // Elevation crank minimum
+    const ELEVATION_CRANK_MAX = 200;   // Elevation crank maximum
+    
+    // --- Bipod Elevation Mechanical Limits ---
+    const BIPOD_ELEVATION_MIN = -150;  // Bipod leg minimum (compressed)
+    const BIPOD_ELEVATION_MAX = 150;   // Bipod leg maximum (extended)
+    
+    // --- Derived Movement Variables ---
+    // SIGHT SETTING: Rotates sight mechanism
+    // - Moves background (what you see through the sight): 20 px/mil
+    // - Creates parallax offset for sticks: 2.5 px/mil additional
+    let sightBackgroundMovement = 0;
+    $: sightBackgroundMovement = -sightDeflection * DEFLECTION_CRANK_PX_PER_MIL;
+    
+    let sightParallaxOffset = 0;
+    $: sightParallaxOffset = sightDeflection * SIGHT_PARALLAX_PX_PER_MIL;
+    
+    // DEFLECTION: Combined bipod position + crank
+    // - Both affect background and stick movement
+    let totalDeflectionMovement = 0;
+    $: totalDeflectionMovement = -(bipodPosition + deflectionCrank) * DEFLECTION_CRANK_PX_PER_MIL;
+    
+    // TOTAL BACKGROUND MOVEMENT: Sight setting + total deflection
+    let backgroundMovement = 0;
+    $: backgroundMovement = sightBackgroundMovement + totalDeflectionMovement;
+    
+    // STICK POSITIONS: Background movement + parallax offset
+    let frontStickMovement = 0;
+    let backStickMovement = 0;
+    
+    $: frontStickMovement = backgroundMovement + (sightParallaxOffset * FRONT_PARALLAX);
+    $: backStickMovement = backgroundMovement + (sightParallaxOffset * BACK_PARALLAX);
+    
+    // Elevation changes the vertical position of the sight view
+    // SIGHT STAYS FIXED - only background and sticks move (elevation parallax)
+    let backgroundElevationShift = 0;
+    let backStickElevationShift = 0;
+    let frontStickElevationShift = 0;
+    
+    // Calculate total elevation offset from reference
+    let totalElevationOffset = 0;
+    $: totalElevationOffset = sightElevation + bipodElevation - REFERENCE_ELEVATION + elevationCrank;
+    
+    // INVERTED: Higher elevation = look DOWN at ground (negative shift)
+    $: backgroundElevationShift = -totalElevationOffset * ELEVATION_SENSITIVITY * BACKGROUND_ELEVATION_PARALLAX;
+    $: backStickElevationShift = -totalElevationOffset * ELEVATION_SENSITIVITY * BACK_STICK_ELEVATION_PARALLAX;
+    $: frontStickElevationShift = -totalElevationOffset * ELEVATION_SENSITIVITY * FRONT_STICK_ELEVATION_PARALLAX;
+    
+    // --- Spirit Level Physics ---
+    // The CRANKS affect spirit levels (rotating/tilting the mortar base)
+    // The sight settings do NOT affect spirit levels
+    
+    // Environmental terrain tilt (accumulated from rough adjustments)
+    let environmentalTilt = 0;
+    
+    // THREE SOURCES OF LATERAL TILT:
+    // 1. Environmental: Random terrain variation from rough adjustments (1-6 mils)
+    // 2. Elevation coupling: Mortar elevation affects lateral balance (0.01-0.04 mils per elevation mil)
+    // 3. Deflection: Non-linear effect as crank approaches limits (quadratic curve, max 25 mils)
+    
+    let deflectionLateralEffect = 0;
+    let elevationLateralEffect = 0;
+    
+    // Deflection effect: Quadratic curve - gentle at center, sharp at edges
+    $: {
+        const crankRatio = deflectionCrank / 250;  // Normalized to ±1
+        deflectionLateralEffect = Math.sign(crankRatio) * Math.pow(Math.abs(crankRatio), 2) * 25;
+    }
+    
+    // Elevation coupling: Random factor applied to mortar elevation
+    $: {
+        const elevationOffset = mortarElevation - REFERENCE_ELEVATION;  // Offset from 350
+        const couplingFactor = 0.01 + (Math.random() * 0.03);  // Random 0.01-0.04
+        elevationLateralEffect = elevationOffset * couplingFactor;
+    }
+    
+    // Elevation spirit level logic:
+    // Spirit levels are mounted on the sighting instrument (sightElevation)
+    // Mortar elevation (bipod + crank) moves the cross beam
+    // Bubble centers when sight setting matches mortar tube angle
+    let elevationLongitudinalEffect = 0;
+    $: elevationLongitudinalEffect = sightElevation - (REFERENCE_ELEVATION + bipodElevation + elevationCrank);
+    
+    // Spirit level bubble physics
+    // Calculate full tilt values (needed for crank compensation)
+    let lateralBubbleCalc = 0;
+    let elevationBubbleCalc = 0;
+    
+    // Only cross-level and three tilt sources affect horizontal bubble
+    $: lateralBubbleCalc = (-crossLevelAngle + environmentalTilt + elevationLateralEffect + deflectionLateralEffect) * LEVEL_SENSITIVITY;
+    $: elevationBubbleCalc = elevationLongitudinalEffect * LEVEL_SENSITIVITY;
+    
+    // Constrain bubble display to spirit level boundaries
+    // Spirit level: 200px wide, bubble: 100px wide
+    // Max travel: (200 - 100) / 2 = 50px from center
+    const BUBBLE_MAX_TRAVEL = 50; // pixels
+    
+    let lateralBubblePos = 0;
+    let elevationBubblePos = 0;
+    
+    $: lateralBubblePos = Math.max(-BUBBLE_MAX_TRAVEL, Math.min(BUBBLE_MAX_TRAVEL, lateralBubbleCalc));
+    $: elevationBubblePos = Math.max(-BUBBLE_MAX_TRAVEL, Math.min(BUBBLE_MAX_TRAVEL, elevationBubbleCalc));
+    
+    // --- Total Aiming State ---
+    let mortarDeflection = 0;  // Physical mortar orientation (ONLY bipod + crank)
+    let totalDeflection = 0;   // Fire mission total (sight + mortar)
+    let totalElevation = 0;    // Fire mission total (sight + mortar)
+    let mortarElevation = 0;   // Physical mortar tube angle: REFERENCE (350) + bipod + crank (0-700 range)
+    
+    $: mortarDeflection = bipodPosition + deflectionCrank;  // Physical only
+    $: totalDeflection = sightDeflection + bipodPosition + deflectionCrank;  // For fire mission
+    $: totalElevation = sightElevation + bipodElevation + elevationCrank;
+    $: mortarElevation = REFERENCE_ELEVATION + bipodElevation + elevationCrank;  // 350 is the zero point
+    
+    // --- Deflection Crank Position (for visual indicator) ---
+    // Normalize to 0-1 range for visual display
+    let deflectionCrankPercent = 0;
+    $: deflectionCrankPercent = (deflectionCrank - DEFLECTION_CRANK_MIN) / (DEFLECTION_CRANK_MAX - DEFLECTION_CRANK_MIN);
+    
+    // --- Success Conditions ---
+    const ALIGNMENT_TOLERANCE = 3;        // Pixels - how close symmetry must be
+    const LEVEL_TOLERANCE = 2;           // Pixels within which bubbles must be centered
+    const SIGHT_SETTING_TOLERANCE = 20;  // Mils - how close sight must match target (10x scale)
+    
+    let isRegistered = false;
+    let isLaid = false;
+    
+    // Registration: Parallax symmetry achieved at zero + levels centered
+    // Distance from crosshair (0) to back stick should equal distance from back stick to front stick
+    $: {
+        const crosshairPos = 0;  // Crosshair is always centered
+        const distanceToBack = Math.abs(backStickMovement - crosshairPos);
+        const distanceBackToFront = Math.abs(frontStickMovement - backStickMovement);
+        const symmetryError = Math.abs(distanceToBack - distanceBackToFront);
+        
+        isRegistered = symmetryError < ALIGNMENT_TOLERANCE &&
+                       Math.abs(lateralBubblePos) < LEVEL_TOLERANCE &&
+                       Math.abs(elevationBubblePos) < LEVEL_TOLERANCE &&
+                       Math.abs(sightDeflection) < SIGHT_SETTING_TOLERANCE &&
+                       Math.abs(sightElevation - REFERENCE_ELEVATION) < SIGHT_SETTING_TOLERANCE;
+    }
+    
+    // Fire Mission: Parallax symmetry achieved at target + levels centered + sight set correctly
+    $: {
+        const crosshairPos = 0;
+        const distanceToBack = Math.abs(backStickMovement - crosshairPos);
+        const distanceBackToFront = Math.abs(frontStickMovement - backStickMovement);
+        const symmetryError = Math.abs(distanceToBack - distanceBackToFront);
+        
+        isLaid = symmetryError < ALIGNMENT_TOLERANCE &&
+                 Math.abs(lateralBubblePos) < LEVEL_TOLERANCE &&
+                 Math.abs(elevationBubblePos) < LEVEL_TOLERANCE &&
+                 Math.abs(sightDeflection - targetDeflection) < SIGHT_SETTING_TOLERANCE &&
+                 Math.abs(sightElevation - targetElevation) < SIGHT_SETTING_TOLERANCE;
+    }
+    
+    // --- Control Functions ---
+    function adjustCrossLevel(delta) {
+        crossLevelAngle += delta;
+    }
+    
+    function adjustDeflection(delta) {
+        // Clamp to mechanical limits of extension piston
+        deflectionCrank = Math.max(DEFLECTION_CRANK_MIN, 
+                                   Math.min(DEFLECTION_CRANK_MAX, 
+                                            deflectionCrank + delta));
+    }
+    
+    function adjustRoughDeflection(delta) {
+        // Rough adjustment moves entire bipod, deflection crank stays where it is
+        bipodPosition += delta;
+        
+        // Add environmental terrain variation (1-6 mils random)
+        const terrainVariation = 1 + (Math.random() * 5);  // Random 1-6 mils
+        const direction = Math.random() < 0.5 ? -1 : 1;    // Random direction
+        environmentalTilt += terrainVariation * direction;
+    }
+    
+    function adjustElevation(delta) {
+        // Calculate proposed actual elevation
+        const proposedCrank = elevationCrank + delta;
+        const proposedActual = REFERENCE_ELEVATION + bipodElevation + proposedCrank;
+        
+        // Clamp actual elevation to [0, 700]
+        if (proposedActual < 0) {
+            elevationCrank = -(REFERENCE_ELEVATION + bipodElevation);
+        } else if (proposedActual > 700) {
+            elevationCrank = 700 - (REFERENCE_ELEVATION + bipodElevation);
+        } else {
+            // Within limits, apply with mechanical crank limits
+            elevationCrank = Math.max(ELEVATION_CRANK_MIN, 
+                                      Math.min(ELEVATION_CRANK_MAX, proposedCrank));
+        }
+    }
+    
+    function adjustRoughElevation(nominalDelta) {
+        // Rough adjustment by moving bipod legs - adds randomness for smaller increments
+        let actualDelta = nominalDelta;
+        
+        // Add imprecision for ±75 mil adjustments (±10 mil slop)
+        if (Math.abs(nominalDelta) === 75) {
+            const slop = (Math.random() * 20) - 10; // Random value between -10 and +10
+            actualDelta = nominalDelta + slop;
+        }
+        
+        // Calculate proposed bipod and actual elevation
+        const proposedBipod = bipodElevation + actualDelta;
+        const proposedActual = REFERENCE_ELEVATION + proposedBipod + elevationCrank;
+        
+        // First clamp to actual elevation range [0, 700]
+        let clampedBipod = proposedBipod;
+        if (proposedActual < 0) {
+            clampedBipod = -(REFERENCE_ELEVATION + elevationCrank);
+        } else if (proposedActual > 700) {
+            clampedBipod = 700 - (REFERENCE_ELEVATION + elevationCrank);
+        }
+        
+        // Then clamp to bipod mechanical limits [-150, +150]
+        bipodElevation = Math.max(BIPOD_ELEVATION_MIN, 
+                                  Math.min(BIPOD_ELEVATION_MAX, clampedBipod));
+    }
+    
+    // Fire mission execution
+    function fireMission() {
+        if (!isLaid) {
+            alert('Cannot fire: Mortar not laid on target!');
+            return;
+        }
+        if (roundInventory[roundType] < roundsToFire) {
+            alert(`Insufficient ${roundType} rounds! Available: ${roundInventory[roundType]}, Requested: ${roundsToFire}`);
+            return;
+        }
+        
+        // Validate fuze settings
+        let fuzeDescription = '';
+        if (roundType === 'ILLUM') {
+            if (fuzeDelay === 0) {
+                alert('Illumination rounds require a delay timer!');
+                return;
+            }
+            fuzeDescription = `Timer: ${fuzeDelay}s (airburst over target)`;
+        } else if (roundType === 'SMOKE') {
+            if (fuzeDelay === 0) {
+                alert('Smoke rounds require a delay timer!');
+                return;
+            }
+            fuzeDescription = `Timer: ${fuzeDelay}s (ground deployment)`;
+        } else if (roundType === 'HE') {
+            if (fuzeType === 'proximity') {
+                fuzeDescription = 'Proximity fuze (area effect airburst)';
+            } else if (fuzeType === 'delay') {
+                fuzeDescription = 'Delay fuze (penetration/entrenchment)';
+            } else {
+                fuzeDescription = 'Impact fuze (surface fragmentation)';
+            }
+        }
+        
+        // Fire the rounds
+        roundInventory[roundType] -= roundsToFire;
+        totalRoundsAvailable -= roundsToFire;
+        roundsFired += roundsToFire;
+        
+        alert(`FIRE FOR EFFECT!
+
+Type: ${roundType}
+Rounds: ${roundsToFire}
+Charge: ${targetCharge}
+Fuze: ${fuzeDescription}
+
+Remaining ${roundType}: ${roundInventory[roundType]}
+Total remaining: ${totalRoundsAvailable}`);
+        
+        // Advance to next mission or end game
+        if (gameActive) {
+            currentMissionIndex++;
+            if (currentMissionIndex >= missionsPerGame) {
+                alert(`GAME COMPLETE!\n\n3 missions fired.\nTotal rounds expended: ${roundsFired}`);
+                endGame();
+            } else {
+                alert(`Mission ${currentMissionIndex}/3 complete!\n\nNext mission loading...`);
+                loadNextMission();
+            }
+        }
+    }
+    
+    function startGame() {
+        gameActive = true;
+        currentMissionIndex = 0;
+        roundsFired = 0;
+        totalRoundsAvailable = 30;
+        roundInventory = { HE: 20, ILLUM: 5, SMOKE: 5 };
+        loadNextMission();
+        alert('GAME STARTED!\n\n3 fire missions incoming.\nMission 1/3 loaded.');
+    }
+    
+    function loadNextMission() {
+        const mission = gameMissions[currentMissionIndex];
+        targetDeflection = mission.deflection;
+        targetElevation = mission.elevation;
+        targetCharge = mission.charge;
+        roundType = mission.roundType;
+        fuzeType = mission.fuzeType || 'impact';
+        fuzeDelay = mission.fuzeDelay || 0;
+        roundsToFire = 1;
+    }
+    
+    function endGame() {
+        gameActive = false;
+        currentMissionIndex = 0;
+    }
+</script>
+
+<style>
+    .game-container {
+        max-width: 2400px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 20px;
+        color: #d4d1c5;
+    }
+
+    .title {
+        font-size: 3rem;
+        font-weight: bold;
+        text-align: center;
+        color: #9ca041; /* Swedish military yellow-green */
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 4px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+    }
+
+    .subtitle {
+        text-align: center;
+        color: #a39e8b;
+        margin-bottom: 30px;
+        font-size: 1.1rem;
+    }
+
+    .main-layout {
+        position: relative;
+        display: inline-block;
+    }
+    
+    /* SightView - anchor object, left page edge */
+    .sight-view-container {
+        position: relative;
+    }
+    
+    /* ElevationCoarse - right of SightView, center-aligned to ElevationFine */
+    .elevation-coarse-container-wrapper {
+        position: absolute;
+        left: calc(1800px + 30px + 76.4px);  /* Center under ElevationFine: offset by (541.8-389)/2 */
+        top: 0;
+    }
+    
+    /* LateralFine - below SightView, left-aligned */
+    .lateral-fine-wrapper {
+        position: absolute;
+        left: 0;
+        top: calc(1800px + 30px);  /* SightView height + gap */
+    }
+
+    /* LateralCoarse - right of LateralFine, BOTTOM ALIGNMENT LOCKED */
+    .lateral-coarse-wrapper {
+        position: absolute;
+        left: calc(420px + 30px);  /* Right of LateralFine: LateralFine width (420px) + gap (30px) */
+        top: 2056px;  /* LOCKED BOTTOM ALIGNMENT: LateralFine bottom (2306px) - LateralCoarse height (250px) = 2056px */
+    }
+    
+    /* ElevationFine - right of SightView, bottom-aligned */
+    .elevation-fine-container-wrapper {
+        position: absolute;
+        left: calc(1800px + 30px);  /* Right of SightView */
+        top: calc(1800px - 248px);  /* Align bottom to SightView bottom: 1800px - (413px × 0.6) */
+    }
+    
+    /* ControlPanel - right of ElevationFine */
+    .control-panel-wrapper {
+        position: absolute;
+        left: calc(1800px + 30px + 542px + 30px);  /* Right of ElevationFine: ElevationFine left + ElevationFine width + gap */
+        top: 0;
+    }
+
+    .control-panel {
+        background: rgba(55, 60, 50, 0.95); /* Drab olive green */
+        border-radius: 8px;
+        padding: 25px;
+        border: 2px solid #4a4f42; /* Dark woodland green */
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+        width: 600px;
+        z-index: 100; /* Bring to front on z-axis */
+        position: relative;
+    }
+</style>
+
+<div class="game-container">
+    <h1 class="title">Mortar Duty</h1>
+    <p class="subtitle">Swedish Mortar Aiming Simulator</p>
+
+    <div class="main-layout">
+        <!-- SightView - anchor at left page edge -->
+        <div class="sight-view-container">
+            <SightView 
+                {backgroundMovement}
+                {frontStickMovement}
+                {backStickMovement}
+                {backgroundElevationShift}
+                {backStickElevationShift}
+                {frontStickElevationShift}
+            />
+        </div>
+        
+        <!-- ElevationCoarse - right of SightView -->
+        <div class="elevation-coarse-container-wrapper">
+            <ElevationCoarse {sightElevation} />
+        </div>
+        
+        <!-- LateralFine - below SightView, left-aligned -->
+        <div class="lateral-fine-wrapper">
+            <LateralFine {sightDeflection} />
+        </div>
+        
+        <!-- LateralCoarse - left aligned to SightView right edge, bottom-aligned to LateralFine -->
+        <div class="lateral-coarse-wrapper">
+            <LateralCoarse {sightDeflection} />
+        </div>
+        
+        <!-- ElevationFine - below ElevationCoarse, center-aligned -->
+        <div class="elevation-fine-container-wrapper">
+            <ElevationFine {sightElevation} />
+        </div>
+        
+        <!-- Control Panel - right of ElevationFine -->
+        <div class="control-panel-wrapper">
+            <div class="control-panel">
+                <!-- Status Display -->
+                <StatusDisplay 
+                    {sightDeflection}
+                    {bipodPosition}
+                    {deflectionCrank}
+                    {mortarDeflection}
+                    {sightElevation}
+                    {bipodElevation}
+                    {elevationCrank}
+                    {crossLevelAngle}
+                    {totalElevation}
+                    {mortarElevation}
+                    {isRegistered}
+                    {isLaid}
+                />
+
+                <!-- Spirit Levels -->
+                <SpiritLevels 
+                    {lateralBubblePos}
+                    {elevationBubblePos}
+                />
+
+                <!-- Deflection Piston Indicator -->
+                <DeflectionIndicator 
+                    {deflectionCrank}
+                    {deflectionCrankPercent}
+                    {DEFLECTION_CRANK_MIN}
+                    {DEFLECTION_CRANK_MAX}
+                />
+
+                <!-- Crank Controls -->
+                <CrankControls 
+                    {adjustCrossLevel}
+                    {adjustDeflection}
+                    {adjustElevation}
+                    {adjustRoughDeflection}
+                    {adjustRoughElevation}
+                    {crankGranularity}
+                    {roughDeflectionStep}
+                />
+
+                <!-- Fire Mission & Sighting Controls -->
+                <MissionControls 
+                    bind:targetDeflection
+                    bind:targetElevation
+                    bind:targetCharge
+                    bind:roundsToFire
+                    bind:roundType
+                    bind:fuzeType
+                    bind:fuzeDelay
+                    bind:sightDeflection
+                    bind:sightElevation
+                    {deflectionGranularity}
+                    {elevationGranularity}
+                    {totalRoundsAvailable}
+                    {roundsFired}
+                    {roundInventory}
+                    {isLaid}
+                    {fireMission}
+                    {gameActive}
+                    {currentMissionIndex}
+                    {startGame}
+                />
+            </div>
+        </div>
+    </div>
+</div>

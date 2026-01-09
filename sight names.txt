@@ -1,0 +1,47 @@
+sight_elevation_deflection_fine_cylinder.png
+you need to move the container for sight_lateral_deflection so that ist doesnt collide with sight_elevation_deflection_fine container
+
+hese are the layout rules:
+
+top row (3 columns): 
+1 column that is 2x2 [dimensions] that fits sight view.
+2 column 1x2 that fits elevation coarse. 
+3 Control panel
+aligned to page top
+
+
+botom row (3 columns) :
+1 lateral fine 
+2 lateral coarse
+3 elevation fine
+
+scaled to fit beneath row one colmun 1+2, as to not obstruct control panel, wich spans both rows
+aligned to tallest container bottom, 
+
+
+
+SightView - The main aiming reticle (1800x1800px)
+ElevationCoarse - The 100-scale elevation indicator
+LateralFine - The rotating dial (scaled 1.4x)
+LateralCoarse - The cylinder with scrolling numbers (scaled 2.1x)
+ElevationFine - The fine elevation cylinder (scaled 0.6x)
+ControlPanel - The UI controls on the right
+
+
+Under Projekt 3 har ni haft mer tid på er än vanligt. I den här frågan ska ni svara på vad det har inneburit, hur det har påverkat ert arbete. Ni får fritt resonera och disponera er text, men håll det runt en a4 (4000-5000 tecken). Resonemang som är relevanta kan vara
+
+Planering och delegering (Hur hanterade ni när en uppgift visade sig ta mer eller mindre tid i anspråk än beräknat?)
+Uppskattning av tid (När var ni som mest effektiva, varför? När var ni som minst effektiva, varför? Går det att styra?)
+Närvaro VS. Deltagande 
+Prokrastinering (att ha en diffus bild av vad som BORDE göras, men vara för kognitivt belastad för att GÖRA)
+Identifierade tidsfällor (vilka aktiviteter tog tid, var aktiva, men ledde egentligen inte framåt)
+Deadlines (varför sätter vi dessa? vem har rätt att ändra dom?)
+
+Ord jag tänker knyter an här är också ansvar, ambitioner, konsekvenser, förutsättningar och respekt.
+
+Hur gör ni det mesta av tiden i ett projektarbete?
+
+Tanken är att ni ska fokusera på perspektivet TID, inte sociala aspekter. Det intressanta är inte hur ni upplevde att ni bröt eller upprätthöll scheman eller inte, utan hur tiden "försvann". Tämk på tiden som en ekonomi. 
+På samma sätt som det inte alltid är uppenbart hur lönen tog slut så snabbt som den bevisligen gjorde, gör tiden det också. Spenderad tid (eller lön för den delen) blir lätt abstrakt, hur gör man den synlig både framåt och bakåt? Hur gör vi så att vi känner att vi fått ut max av den?
+
+Den här reflektionen blir ett verktyg att ta med sig in i Examensarbetet och i bästa fall grunden för en filosofi som hjälper er även efter det.
