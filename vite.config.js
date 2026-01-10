@@ -5,7 +5,7 @@ import path from 'path'
 export default defineConfig({
   plugins: [svelte()],
   publicDir: 'assets',
-  base: '/Meum_Fieri/',
+  base: '/Meum_Fieri/mortar/',
   resolve: {
     alias: {
       '$lib': path.resolve('./src/lib'),
