@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Erik Olsson - Creative Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      background: url('start.jpg') center center / cover no-repeat fixed;
+      display: flex;
+      font-family: 'Rajdhani', sans-serif;
+      position: relative;
+    }
+    body::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.3); z-index: 0;
+    }
+    .main-nav {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
+    .nav-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      border: 0 solid rgba(255, 255, 255, 0);
+    }
+    .nav-section::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.2);
+      transition: all 0.5s ease;
+      z-index: -1;
+    }
+    .nav-section:hover {
+      flex: 1.2;
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .nav-section:hover::after {
+      background: rgba(0, 0, 0, 0);
+    }
+    .nav-section h2 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(3rem, 10vw, 8rem);
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 0 0 30px rgba(255, 255, 255, 0.3), 0 10px 20px rgba(0, 0, 0, 0.8);
+      letter-spacing: clamp(10px, 2vw, 30px);
+      transition: all 0.5s ease;
+    }
+    .nav-section:hover h2 {
+      transform: scale(1.1);
+      text-shadow: 0 0 50px rgba(255, 255, 255, 0.6), 0 15px 30px rgba(0, 0, 0, 0.9);
+    }
+    .nav-section.fun { border-right: 1px solid rgba(255, 255, 255, 0.1); }
+    
+    .subtitle {
+      position: absolute;
+      bottom: 10%;
+      font-size: clamp(0.8rem, 1.5vw, 1.2rem);
+      color: rgba(255, 255, 255, 0.6);
+      text-transform: uppercase;
+      letter-spacing: 5px;
+      transition: all 0.5s ease;
+    }
+    .nav-section:hover .subtitle {
+      color: #fff;
+      transform: translateY(-10px);
+    }
+    .overlay-text {
+        position: absolute;
+        top: 5%;
+        width: 100%;
+        text-align: center;
+        font-family: 'Orbitron', sans-serif;
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 0.9rem;
+        letter-spacing: 10px;
+        z-index: 2;
+        pointer-events: none;
+    }
+    @media (max-width: 768px) {
+      .main-nav { flex-direction: column; }
+      .nav-section.fun { border-right: none; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+      .nav-section:hover { flex: 1.5; }
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay-text">ERIK OLSSON PORTFOLIO</div>
+  <nav class="main-nav">
+    <a href="fun.html" class="nav-section fun">
+      <h2>FUN</h2>
+      <span class="subtitle">EXPERIMENTS & APPS</span>
+    </a>
+    <a href="games.html" class="nav-section games">
+      <h2>GAMES</h2>
+      <span class="subtitle">PLAY & CHALLENGE</span>
+    </a>
+  </nav>
+</body>
+</html>
