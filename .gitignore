@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build artifacts (Rust/WASM)
+target/
+
+# Source files (we only need dist)
+projects/*/src/
+projects/screen-print/src/
+projects/art-study-build/src/
+projects/art-study-build/public/
+projects/art-study-build/PRD/
+
+# Misc
+*.pdf
+*.ods
+*.xlsx
+*.svg
