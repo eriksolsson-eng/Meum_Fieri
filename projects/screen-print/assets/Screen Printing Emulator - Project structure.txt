@@ -1,0 +1,10 @@
+Screen Printing Emulator - Project structure/
+├── src/
+│   ├── lib/
+│   │   ├── Scraper.svelte       # UI Component for the slider
+│   │   ├── CanvasDisplay.svelte  # Layer stacking logic
+│   │   └── stores.js            # Reactive state for colors/layers
+│   ├── App.svelte               # Main entry point
+├── rust-toolchain/
+│   └── src/lib.rs               # Rust/Wasm logic (Image processing)
+└── public/                      # Static assets

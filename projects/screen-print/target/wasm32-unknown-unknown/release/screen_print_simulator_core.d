@@ -1,0 +1,1 @@
+/home/erik/Documents/Websida/Erik_Olsson_Homepage_Svelte/Apps/Screen_print_emulator/target/wasm32-unknown-unknown/release/screen_print_simulator_core.wasm: /home/erik/Documents/Websida/Erik_Olsson_Homepage_Svelte/Apps/Screen_print_emulator/src/lib.rs
